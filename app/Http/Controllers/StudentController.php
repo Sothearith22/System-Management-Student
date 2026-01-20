@@ -4,10 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Student;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class StudentController extends Controller
 {
-    //show with class
+    // show with class
     public function ShowStudentWithClass()
     {
         try {
@@ -16,7 +17,7 @@ class StudentController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'All students with courses retrieved successfully',
-                'data' => $students
+                'data' => $students,
             ], 200);
 
         } catch (\Throwable $th) {
@@ -27,7 +28,7 @@ class StudentController extends Controller
         }
     }
 
-    //show all students
+    // show all students
     public function showAllStudents()
     {
         try {
@@ -52,30 +53,39 @@ class StudentController extends Controller
      */
     public function store(Request $request)
     {
+        // DB::beginTransaction();
+
         try {
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'email' => 'required|email|unique:students,email',
                 'phone' => 'required|string|min:8|max:15',
-                'course_id' => 'required|exists:courses,id',
+                'class_id' => 'required|exists:course_classes,id',
             ]);
 
-            $student = Student::create($validated);
+            $student = Student::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'phone' => $validated['phone'],
+            ]);
 
-            // AUTO ENROLL STUDENT TO COURSE
-            $student->courses_class()->attach($validated['course_id']);
+            $student->classes()->attach($validated['class_id']);
+
+            // DB::commit();
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Student created and enrolled successfully',
-                'data' => $student->load('course_classes'),
+                'data' => $student->load('classes'),
             ], 201);
 
         } catch (\Throwable $th) {
+            DB::rollBack();
+
             return response()->json([
                 'status' => 'error',
                 'message' => $th->getMessage(),
-            ], 422);
+            ], 500);
         }
     }
 
@@ -120,7 +130,7 @@ class StudentController extends Controller
             $validated = $request->validate([
                 'name' => 'sometimes|string|min:4',
                 'phone' => 'sometimes|string|min:8',
-                'email' => 'sometimes|email|unique:students,email,' . $id,
+                'email' => 'sometimes|email|unique:students,email,'.$id,
             ]);
 
             $student->update($validated);
@@ -154,7 +164,7 @@ class StudentController extends Controller
         } catch (\Throwable $th) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Deletion failed: ' . $th->getMessage(),
+                'message' => 'Deletion failed: '.$th->getMessage(),
             ], 500);
         }
     }
