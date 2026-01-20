@@ -71,8 +71,6 @@ class StudentController extends Controller
 
             $student->classes()->attach($validated['class_id']);
 
-            // DB::commit();
-
             return response()->json([
                 'status' => 'success',
                 'message' => 'Student created and enrolled successfully',
@@ -80,8 +78,6 @@ class StudentController extends Controller
             ], 201);
 
         } catch (\Throwable $th) {
-            DB::rollBack();
-
             return response()->json([
                 'status' => 'error',
                 'message' => $th->getMessage(),
