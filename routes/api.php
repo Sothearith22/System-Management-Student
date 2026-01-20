@@ -23,9 +23,9 @@ Route::middleware(['auth:sanctum'])->group(function(){
 
     //Student
     Route::controller(StudentController::class)->group(function(){
-        Route::get('/student','index');
-        Route::post('/student/enroll',  'enroll');
-        Route::post('/student','store');
+        Route::get('/student/class','ShowStudentWithClass');
+        Route::get('/student/all',  'showAllStudents');
+        Route::post('/student/all','store');
         Route::get('/student/{id}','show');
         Route::patch('/student/{id}','update');
         Route::delete('/student/{id}','delete');
@@ -42,10 +42,10 @@ Route::middleware(['auth:sanctum'])->group(function(){
 
     //Attendentces
     Route::controller(AttendanceController::class)->group(function(){
-        Route::get('/attendence',"index");
-        Route::post('/attendence/{stuid}',"getStudentAttendance");
-        Route::get('/attendence/{id}','show');
-        Route::patch('/attendence/{id}','update');
+        Route::get('/attendence/all',"index");
+        Route::post('/attendence','store');
+        Route::get('/attendence/{stuid}',"getStudentAttendance"); //by id
+        Route::patch('/attendence/{id}','update'); //sometime
         Route::delete('/attendence/{id}','destroy');
     });
 

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class CourseClass extends Model
 {
     use HasFactory;
+
     protected $table = 'course_classes';
 
     protected $fillable = ['course', 'room', 'term', 'class_time'];
@@ -17,8 +18,13 @@ class CourseClass extends Model
      */
     public function students()
     {
-        return $this->belongsToMany(Student::class, 'enrollment', 'class_id', 'student_id')
-                    ->withTimestamps();
+        return $this->belongsToMany(
+            Student::class,
+            'enrollment',
+            'class_id',
+            'student_id'
+        )
+            ->withTimestamps();
     }
 
     /**
@@ -28,4 +34,14 @@ class CourseClass extends Model
     {
         return $this->hasMany(Attendance::class, 'class_id');
     }
+
+    // app/Models/CourseClass.php
+
+    public function users()
+    {
+        return $this->belongsToMany(User::class, 'course_user', 'class_id', 'user_id')
+            ->withTimestamps();
+    }
+
+
 }

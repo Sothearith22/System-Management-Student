@@ -21,7 +21,19 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'status',  //P,A ,PM
+
     ];
+
+    // demo
+
+    // app/Models/User.php
+
+    public function classes()
+    {
+        return $this->belongsToMany(CourseClass::class, 'course_user', 'user_id', 'class_id')
+            ->withTimestamps();
+    }
 
     /**
      * The attributes that should be hidden for serialization.
@@ -39,7 +51,7 @@ class User extends Authenticatable
      * @var array<string, string>
      */
     protected $casts = [
-        'email_verified_at' => 'now',
+        'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
 }

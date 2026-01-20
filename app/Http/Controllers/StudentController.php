@@ -7,22 +7,42 @@ use Illuminate\Http\Request;
 
 class StudentController extends Controller
 {
-    public function index()
+    //show with class
+    public function ShowStudentWithClass()
     {
         try {
+            $students = Student::with('course_classes')->get();
 
+            return response()->json([
+                'status' => 'success',
+                'message' => 'All students with courses retrieved successfully',
+                'data' => $students
+            ], 200);
+
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    //show all students
+    public function showAllStudents()
+    {
+        try {
             $students = Student::all();
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Students retrieved successfully',
-                'data' => $students
-
+                'message' => 'All students retrieved successfully',
+                'data' => $students,
             ], 200);
+
         } catch (\Throwable $th) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to retrieve students: '.$th->getMessage(),
+                'message' => $th->getMessage(),
             ], 500);
         }
     }
@@ -37,40 +57,25 @@ class StudentController extends Controller
                 'name' => 'required|string|max:255',
                 'email' => 'required|email|unique:students,email',
                 'phone' => 'required|string|min:8|max:15',
+                'course_id' => 'required|exists:courses,id',
             ]);
 
             $student = Student::create($validated);
 
+            // AUTO ENROLL STUDENT TO COURSE
+            $student->courses_class()->attach($validated['course_id']);
+
             return response()->json([
                 'status' => 'success',
-                'message' => 'Student created successfully',
-                'data' => $student,
+                'message' => 'Student created and enrolled successfully',
+                'data' => $student->load('course_classes'),
             ], 201);
+
         } catch (\Throwable $th) {
             return response()->json([
                 'status' => 'error',
                 'message' => $th->getMessage(),
             ], 422);
-        }
-    }
-
-    // register course
-
-    public function enroll(Request $request)
-    {
-        try {
-
-            $student = Student::findOrFail($request->student_id);
-
-            $student->classes()->attach($request->class_id);
-
-            return response()->json([
-                'status' => 200,
-                'message' => 'Student enrolled successfully!',
-            ], 200);
-
-        } catch (\Throwable $th) {
-            return response()->json(['message' => $th->getMessage()], 500);
         }
     }
 
@@ -80,18 +85,27 @@ class StudentController extends Controller
     public function show($id)
     {
         try {
-
-            $student = Student::findOrFail($id);
+            $student = Student::with('course_classes')->findOrFail($id);
 
             return response()->json([
                 'status' => 'success',
+                'message' => 'Student retrieved successfully',
                 'data' => $student,
             ], 200);
-        } catch (\Throwable $th) {
+
+        } catch (\Exception $e) {
+
             return response()->json([
                 'status' => 'error',
                 'message' => 'Student not found',
             ], 404);
+
+        } catch (\Throwable $th) {
+
+            return response()->json([
+                'status' => 'error',
+                'message' => $th->getMessage(),
+            ], 500);
         }
     }
 
@@ -106,7 +120,7 @@ class StudentController extends Controller
             $validated = $request->validate([
                 'name' => 'sometimes|string|min:4',
                 'phone' => 'sometimes|string|min:8',
-                'email' => 'sometimes|email|unique:students,email,'.$id,
+                'email' => 'sometimes|email|unique:students,email,' . $id,
             ]);
 
             $student->update($validated);
@@ -114,7 +128,7 @@ class StudentController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Student updated successfully',
-                'data'    => $student->fresh()
+                'data' => $student->fresh(),
             ], 200);
         } catch (\Throwable $th) {
             return response()->json([
@@ -127,7 +141,7 @@ class StudentController extends Controller
     /**
      * Remove the specified student from storage.
      */
-    public function destroy($id)
+    public function delete($id)
     {
         try {
             $student = Student::findOrFail($id);
@@ -140,7 +154,7 @@ class StudentController extends Controller
         } catch (\Throwable $th) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Deletion failed: '.$th->getMessage(),
+                'message' => 'Deletion failed: ' . $th->getMessage(),
             ], 500);
         }
     }

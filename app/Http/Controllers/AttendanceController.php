@@ -43,7 +43,7 @@ class AttendanceController extends Controller
 
             ]);
 
-            $attendence = Attendance::create($validated);
+            $attendence = Attendance::with('students')->create($validated);
 
             return response()->json([
                 'status' => 200,
@@ -72,7 +72,7 @@ class AttendanceController extends Controller
             ], 404);
         }
 
-        $data = Attendance::with('courseClass')
+        $data = Attendance::with('course_classes')
             ->where('student_id', $stuid)
             ->latest()
             ->paginate(10); // change number if needed
@@ -88,61 +88,61 @@ class AttendanceController extends Controller
         ]);
     }
 
-    public function getAttendanceStats()
-    {
-        try {
+    // public function getAttendanceStats()
+    // {
+    //     try {
 
-            $classes = CourseClass::withCount([
-                'attendances as total_absent' => function ($query) {
-                    $query->where('status', 'absent');
-                },
-            ])->get();
+    //         $classes = CourseClass::withCount([
+    //             'attendances as total_absent' => function ($query) {
+    //                 $query->where('status', 'absent');
+    //             },
+    //         ])->get();
 
-            return response()->json([
-                'status' => 'success',
-                'data' => $classes,
-            ], 200);
-        } catch (\Throwable $th) {
-            return response()->json([
-            'status' => 'error',
-            'message' => $th->getMessage()], 500);
-        }
-    }
+    //         return response()->json([
+    //             'status' => 'success',
+    //             'data' => $classes,
+    //         ], 200);
+    //     } catch (\Throwable $th) {
+    //         return response()->json([
+    //         'status' => 'error',
+    //         'message' => $th->getMessage()], 500);
+    //     }
+    // }
 
-    public function getTopAbsentByDate(Request $request)
-    {
-        try {
-            // Get month and year from request, default to current month/year if not provided
-            $month = $request->input('month', date('m'));
-            $year = $request->input('year', date('Y'));
+    // public function getTopAbsentByDate(Request $request)
+    // {
+    //     try {
+    //         // Get month and year from request, default to current month/year if not provided
+    //         $month = $request->input('month', date('m'));
+    //         $year = $request->input('year', date('Y'));
 
-            $students = Student::withCount(['attendances as absent_count'
-                    => function ($query) use ($month, $year) {
-                $query->where('status', 'absent')
-                    ->whereMonth('attendance_date', $month)
-                    ->whereYear('attendance_date', $year);
-            }])
-                ->having('absent_count', '>', 0) // Only include students with at least 1 absence
-                ->orderBy('absent_count', 'desc') // Rank by most absences
-                ->take(10) // Limit to top 10 for dashboard clarity
-                ->get();
+    //         $students = Student::withCount(['attendances as absent_count'
+    //                 => function ($query) use ($month, $year) {
+    //             $query->where('status', 'absent')
+    //                 ->whereMonth('attendance_date', $month)
+    //                 ->whereYear('attendance_date', $year);
+    //         }])
+    //             ->having('absent_count', '>', 0) // Only include students with at least 1 absence
+    //             ->orderBy('absent_count', 'desc') // Rank by most absences
+    //             ->take(10) // Limit to top 10 for dashboard clarity
+    //             ->get();
 
-            return response()->json([
-                'status' => 'success',
-                'filter' => [
-                    'month' => $month,
-                    'year' => $year,
-                ],
-                'data' => $students,
-            ], 200);
+    //         return response()->json([
+    //             'status' => 'success',
+    //             'filter' => [
+    //                 'month' => $month,
+    //                 'year' => $year,
+    //             ],
+    //             'data' => $students,
+    //         ], 200);
 
-        } catch (\Throwable $th) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Failed to fetch absent report: '.$th->getMessage(),
-            ], 500);
-        }
-    }
+    //     } catch (\Throwable $th) {
+    //         return response()->json([
+    //             'status' => 'error',
+    //             'message' => 'Failed to fetch absent report: '.$th->getMessage(),
+    //         ], 500);
+    //     }
+    // }
 
     /**
      * Show the form for editing the specified resource.
