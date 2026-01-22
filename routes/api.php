@@ -25,7 +25,9 @@ Route::middleware(['auth:sanctum'])->group(function(){
     Route::controller(StudentController::class)->group(function(){
         Route::get('/student/class','ShowStudentWithClass');
         Route::get('/student/all',  'showAllStudents');
+        Route::post('/student/create','createStudent');
         Route::post('/student','store');
+        Route::post('/student/enroll','enroll');
         Route::get('/student/{id}','show');
         Route::patch('/student/{id}','update');
         Route::delete('/student/{id}','delete');

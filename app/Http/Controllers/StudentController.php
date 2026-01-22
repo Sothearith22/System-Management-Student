@@ -48,6 +48,25 @@ class StudentController extends Controller
         }
     }
 
+    public function createStudent(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'email' => 'required|email|unique:students,email',
+                'phone' => 'required|string|min:8|max:15',
+
+            ]);
+            $student = Student::create($validated);
+            return response()->json($student, 201);
+        } catch (\Throwable $th) {
+               return response()->json([
+                'status' => 'error',
+                'message' => $th->getMessage(),
+            ], 422);
+        }
+    }
+
     /**
      * Store a newly created student in storage.
      */
@@ -83,6 +102,25 @@ class StudentController extends Controller
                 'message' => $th->getMessage(),
             ], 500);
         }
+    }
+
+    public function enroll(Request $request)
+    {
+        $validated = $request->validate([
+            'student_id' => 'required|exists:students,id',
+            'class_id' => 'required|exists:course_classes,id',
+        ]);
+
+        $student = Student::findOrFail($validated['student_id']);
+
+        $student->classes()->syncWithoutDetaching([
+            $validated['class_id'],
+        ]);
+
+        return response()->json([
+            'message' => 'Student enrolled successfully',
+            'student' => $student,
+        ], 201);
     }
 
     /**
@@ -126,7 +164,7 @@ class StudentController extends Controller
             $validated = $request->validate([
                 'name' => 'sometimes|string|min:4',
                 'phone' => 'sometimes|string|min:8',
-                'email' => 'sometimes|email|unique:students,email,'.$id,
+                'email' => 'sometimes|email|unique:students,email,' . $id,
             ]);
 
             $student->update($validated);
@@ -160,7 +198,7 @@ class StudentController extends Controller
         } catch (\Throwable $th) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Deletion failed: '.$th->getMessage(),
+                'message' => 'Deletion failed: ' . $th->getMessage(),
             ], 500);
         }
     }
