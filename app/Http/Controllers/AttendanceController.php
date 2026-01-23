@@ -39,7 +39,7 @@ class AttendanceController extends Controller
             $validated = $request->validate([
                 'student_id' => 'required|integer|exists:students,id',
                 'class_id' => 'required|integer',
-                'data' => 'required|string|min:1',
+                'date' => 'required|string|min:1',
                 'status' => 'required|string',
                 'remark' => 'required|string',
             ]);
