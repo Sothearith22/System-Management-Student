@@ -47,7 +47,7 @@ class AttendanceController extends Controller
             $attendence = Attendance::create($validated);
 
 
-            $attendence->load('student');
+            $attendence->load('students');
 
             return response()->json([
                 'status' => 200,
