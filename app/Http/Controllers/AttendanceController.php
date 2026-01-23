@@ -6,6 +6,7 @@ use App\Models\Attendance;
 use App\Models\CourseClass;
 use App\Models\Student;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AttendanceController extends Controller
 {
@@ -36,23 +37,58 @@ class AttendanceController extends Controller
     public function store(Request $request)
     {
         try {
+            //  Validate request data
             $validated = $request->validate([
-                'student_id' => 'required|integer|exists:students,id',
-                'class_id' => 'required|integer',
-                'date' => 'required|string|min:1',
+                'student_id' => 'required|exists:students,id',
+                'class_id' => 'required|exists:course_classes,id',
+                'date' => 'required|date',
                 'status' => 'required|string',
-                'remark' => 'required|string',
+                'remark' => 'sometimes|string',
             ]);
 
-            $attendence = Attendance::create($validated);
+            //  Check if student is enrolled in the class
+            $isEnrolled = DB::table('enrollment')
+                ->where('id', $validated['student_id'])
+                ->where('class_id', $validated['class_id'])
+                ->exists();
 
+            if (! $isEnrolled) {
+                return response()->json([
+                    'status' => 403,
+                    'message' => 'Student is not enrolled in this class.',
+                ], 403);
+            }
 
-            $attendence->load('student');
+            //  Check if attendance already marked for this date
+            $alreadyMarked = Attendance::where('id', $validated['student_id'])
+                ->where('class_id', $validated['class_id'])
+                ->where('date', $validated['date'])
+                ->exists();
 
+            if ($alreadyMarked) {
+                return response()->json([
+                    'status' => 409,
+                    'message' => 'Attendance already marked for this student on this date.',
+                ], 409);
+            }
+
+            //  Check if the date is in the future
+            $attendanceDate = Attendance::parse($validated['date']);
+            if ($attendanceDate->gt(Attendance::today())) {
+                return response()->json([
+                    'status' => 422,
+                    'message' => 'Cannot set attendance date in the future.',
+                ], 422);
+            }
+
+            //  Create attendance
+            $attendance = Attendance::create($validated);
+
+            //  Return success response
             return response()->json([
-                'status' => 200,
-                'message' => 'Attendance Created Successfully',
-                'data' => $attendence,
+                'status' => 201,
+                'message' => 'Attendance created successfully.',
+                'data' => $attendance,
             ], 201);
 
         } catch (\Throwable $th) {
@@ -165,12 +201,17 @@ class AttendanceController extends Controller
        try {
             $attendance = Attendance::findOrFail($id);
 
-            $attendance->update($request->all());
+            $validated = $request->validate([
+                'status' => 'sometimes|string|in:present,absent,late,permission',
+                'remark' => 'sometimes|nullable|string',
+            ]);
+
+            $attendance->update($validated);
 
             return response()->json([
                 'status' => 200,
                 'message' => 'Updated successfully',
-                'data' => $attendance
+                'data' => $attendance,
             ], 200);
         } catch (\Throwable $th) {
             return response()->json(['status' => 500, 'message' => $th->getMessage()], 500);
