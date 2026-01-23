@@ -37,19 +37,24 @@ class AttendanceController extends Controller
     {
         try {
             $validated = $request->validate([
+                'student_id' => 'required|integer|exists:students,id',
+                'class_id' => 'required|integer',
                 'data' => 'required|string|min:1',
                 'status' => 'required|string',
                 'remark' => 'required|string',
-
             ]);
 
-            $attendence = Attendance::with('students')->create($validated);
+            $attendence = Attendance::create($validated);
+
+
+            $attendence->load('student');
 
             return response()->json([
                 'status' => 200,
-                'message' => 'Attendence Create Successfully',
+                'message' => 'Attendance Created Successfully',
                 'data' => $attendence,
             ], 201);
+
         } catch (\Throwable $th) {
             return response()->json([
                 'status' => 500,
@@ -157,10 +162,19 @@ class AttendanceController extends Controller
      */
     public function update(Request $request, Attendance $attendance, $id)
     {
-        $attendance = Attendance::findOrFail($id);
-        $attendance->update($request->all());
+       try {
+            $attendance = Attendance::findOrFail($id);
 
-        return response()->json($attendance, 200);
+            $attendance->update($request->all());
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Updated successfully',
+                'data' => $attendance
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json(['status' => 500, 'message' => $th->getMessage()], 500);
+        }
     }
 
     /**
