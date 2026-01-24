@@ -46,6 +46,7 @@ Route::middleware(['auth:sanctum'])->group(function(){
     Route::controller(AttendanceController::class)->group(function(){
         Route::get('/attendence/all',"index");
         Route::post('/attendence','store');
+        Route::get('/attendence/class/{id}','getAttendanceStats'); //by class id
         Route::get('/attendence/{stuid}',"getStudentAttendance"); //by id
         Route::patch('/attendence/{id}','update'); //sometime
         Route::delete('/attendence/{id}','destroy');

@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Attendance;
 use App\Models\CourseClass;
 use App\Models\Student;
+use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class AttendanceController extends Controller
@@ -16,7 +18,7 @@ class AttendanceController extends Controller
     public function index()
     {
         try {
-            $attendence = Attendance::with('students')->get();
+            $attendence = Attendance::with('student')->get();
 
             return response()->json([
                 'status' => 200,
@@ -52,7 +54,7 @@ class AttendanceController extends Controller
                 ->where('class_id', $validated['class_id'])
                 ->exists();
 
-            if (! $isEnrolled) {
+            if (!$isEnrolled) {
                 return response()->json([
                     'status' => 403,
                     'message' => 'Student is not enrolled in this class.',
@@ -73,8 +75,8 @@ class AttendanceController extends Controller
             }
 
             //  Check if the date is in the future
-            $attendanceDate = Attendance::parse($validated['date']);
-            if ($attendanceDate->gt(Attendance::today())) {
+            $attendanceDate = Carbon::parse($validated['date']);
+            if ($attendanceDate->gt(Carbon::today())) {
                 return response()->json([
                     'status' => 422,
                     'message' => 'Cannot set attendance date in the future.',
@@ -106,7 +108,7 @@ class AttendanceController extends Controller
     {
         $student = Student::find($stuid);
 
-        if (! $student) {
+        if (!$student) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Student ID not found',
@@ -129,26 +131,44 @@ class AttendanceController extends Controller
         ]);
     }
 
-    // public function getAttendanceStats()
-    // {
-    //     try {
+  public function getAttendanceStats(Request $request, $class_id)
+{
+    try {
+        $currentMonth = now()->month;
+        $currentYear = now()->year;
 
-    //         $classes = CourseClass::withCount([
-    //             'attendances as total_absent' => function ($query) {
-    //                 $query->where('status', 'absent');
-    //             },
-    //         ])->get();
+        $courseClass = CourseClass::withCount([
+            'students',
+             // Use whereRaw to ignore Capital letters
+            'attendances as absent_count' => fn($q) => $q->whereRaw('LOWER(status) = ?', ['absent'])
+                ->whereMonth('created_at', $currentMonth)
+                ->whereYear('created_at', $currentYear),
 
-    //         return response()->json([
-    //             'status' => 'success',
-    //             'data' => $classes,
-    //         ], 200);
-    //     } catch (\Throwable $th) {
-    //         return response()->json([
-    //         'status' => 'error',
-    //         'message' => $th->getMessage()], 500);
-    //     }
-    // }
+            'attendances as present_count' => fn($q) => $q->whereRaw('LOWER(status) = ?', ['present'])
+                ->whereMonth('created_at', $currentMonth)
+                ->whereYear('created_at', $currentYear),
+
+            'attendances as permission_count' => fn($q) => $q->whereRaw('LOWER(status) = ?', ['permission'])
+                ->whereMonth('created_at', $currentMonth)
+                ->whereYear('created_at', $currentYear),
+
+            'attendances as late_count' => fn($q) => $q->whereRaw('LOWER(status) = ?', ['late'])
+                ->whereMonth('created_at', $currentMonth)
+                ->whereYear('created_at', $currentYear),
+        ])->findOrFail($class_id);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $courseClass,
+        ], 200);
+
+    } catch (\Throwable $th) {
+        return response()->json([
+            'status' => 'error',
+            'message' => $th->getMessage(),
+        ], 500);
+    }
+}
 
     // public function getTopAbsentByDate(Request $request)
     // {
@@ -198,7 +218,7 @@ class AttendanceController extends Controller
      */
     public function update(Request $request, Attendance $attendance, $id)
     {
-       try {
+        try {
             $attendance = Attendance::findOrFail($id);
 
             $validated = $request->validate([
