@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Attendance;
 use App\Models\CourseClass;
 use App\Models\Student;
-use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -131,79 +130,75 @@ class AttendanceController extends Controller
         ]);
     }
 
-  public function getAttendanceStats(Request $request, $class_id)
-{
-    try {
-        $currentMonth = now()->month;
-        $currentYear = now()->year;
+    public function getAttendanceStats(Request $request)
+    {
+        try {
+            //  Validate request
+            $validated = $request->validate([
+                'student_id' => 'required|exists:students,id',
+                'class_id' => 'required|exists:course_classes,id',
+            ]);
 
-        $courseClass = CourseClass::withCount([
-            'students',
-             // Use whereRaw to ignore Capital letters
-            'attendances as absent_count' => fn($q) => $q->whereRaw('LOWER(status) = ?', ['absent'])
-                ->whereMonth('created_at', $currentMonth)
-                ->whereYear('created_at', $currentYear),
+            $student = Student::findOrFail($validated['student_id']);
+            $class = CourseClass::findOrFail($validated['class_id']);
 
-            'attendances as present_count' => fn($q) => $q->whereRaw('LOWER(status) = ?', ['present'])
-                ->whereMonth('created_at', $currentMonth)
-                ->whereYear('created_at', $currentYear),
+            // Check enrollment
+            $isEnrolled = DB::table('enrollment')
+                ->where('student_id', $validated['student_id'])
+                ->where('class_id', $validated['class_id'])
+                ->exists();
 
-            'attendances as permission_count' => fn($q) => $q->whereRaw('LOWER(status) = ?', ['permission'])
-                ->whereMonth('created_at', $currentMonth)
-                ->whereYear('created_at', $currentYear),
+            if (!$isEnrolled) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Student is not enrolled in this class',
+                ], 403);
+            }
 
-            'attendances as late_count' => fn($q) => $q->whereRaw('LOWER(status) = ?', ['late'])
-                ->whereMonth('created_at', $currentMonth)
-                ->whereYear('created_at', $currentYear),
-        ])->findOrFail($class_id);
+            //   Attendance statistics
+            $stats = Attendance::where('student_id', $validated['student_id'])
+                ->where('class_id', $validated['class_id'])
+                ->selectRaw("
+                        COUNT(*) as total_records,
+                        SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as total_present,
+                        SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as total_absent,
+                        SUM(CASE WHEN status = 'permission' THEN 1 ELSE 0 END) as total_permission,
+                        SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as total_late
+                    ")
+                ->first();
 
-        return response()->json([
-            'status' => 'success',
-            'data' => $courseClass,
-        ], 200);
+            // Attendance rate
+            $attendanceRate = $stats->total_records > 0
+                ? round(($stats->total_present / $stats->total_records) * 100, 2)
+                : 0;
 
-    } catch (\Throwable $th) {
-        return response()->json([
-            'status' => 'error',
-            'message' => $th->getMessage(),
-        ], 500);
+            return response()->json([
+                'status' => 'success',
+                'student' => [
+                    'id' => $student->id,
+                    'name' => $student->name,
+                ],
+                'class' => [
+                    'id' => $class->id,
+                    'name' => $class->course,
+                ],
+                'attendance' => [
+                    'total_records' => (int) $stats->total_records,
+                    'total_present' => (int) $stats->total_present,
+                    'total_absent' => (int) $stats->total_absent,
+                    'total_permission' => (int) $stats->total_permission,
+                    'total_late' => (int) $stats->total_late,
+                    'attendance_rate' => $attendanceRate . '%',
+                ],
+            ], 200);
+
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $th->getMessage(),
+            ], 500);
+        }
     }
-}
-
-    // public function getTopAbsentByDate(Request $request)
-    // {
-    //     try {
-    //         // Get month and year from request, default to current month/year if not provided
-    //         $month = $request->input('month', date('m'));
-    //         $year = $request->input('year', date('Y'));
-
-    //         $students = Student::withCount(['attendances as absent_count'
-    //                 => function ($query) use ($month, $year) {
-    //             $query->where('status', 'absent')
-    //                 ->whereMonth('attendance_date', $month)
-    //                 ->whereYear('attendance_date', $year);
-    //         }])
-    //             ->having('absent_count', '>', 0) // Only include students with at least 1 absence
-    //             ->orderBy('absent_count', 'desc') // Rank by most absences
-    //             ->take(10) // Limit to top 10 for dashboard clarity
-    //             ->get();
-
-    //         return response()->json([
-    //             'status' => 'success',
-    //             'filter' => [
-    //                 'month' => $month,
-    //                 'year' => $year,
-    //             ],
-    //             'data' => $students,
-    //         ], 200);
-
-    //     } catch (\Throwable $th) {
-    //         return response()->json([
-    //             'status' => 'error',
-    //             'message' => 'Failed to fetch absent report: '.$th->getMessage(),
-    //         ], 500);
-    //     }
-    // }
 
     /**
      * Show the form for editing the specified resource.
