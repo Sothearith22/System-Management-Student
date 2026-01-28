@@ -51,7 +51,7 @@ class AttendanceController extends Controller
                 'class_id' => 'required|exists:course_classes,id',
                 'date' => 'required|date',
                 'status' => 'required|string',
-                'remark' => 'sometimes|string',
+                'remark' => 'sometimes',
             ]);
 
             //  Check if student is enrolled in the class
