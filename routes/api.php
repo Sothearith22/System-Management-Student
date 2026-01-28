@@ -50,6 +50,8 @@ Route::middleware(['auth:sanctum'])->group(function(){
         Route::get('/attendence/{stuid}',"getStudentAttendance"); //by id
         Route::patch('/attendence/{id}','update'); //sometime
         Route::delete('/attendence/{id}','destroy');
+        Route::delete('/attendence','removeStudentFromClass');
     });
+
 
 });

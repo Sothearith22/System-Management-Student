@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use App\Models\CourseClass;
@@ -10,21 +9,24 @@ class CourseClassController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
 
-            $class = CourseClass::with('students')->get();
+            $user = $request->user();
 
+            $classes = $user->classes()
+                ->withCount('students')
+                ->with('students')->get();
             return response()->json([
-                'status' => 200,
+                'status'  => 200,
                 'message' => ' Class retrieved successfully',
-                'data' => $class,
+                'data'    => $classes,
             ], 200);
 
         } catch (\Throwable $th) {
             return response()->json([
-                'status' => 500,
+                'status'  => 500,
                 'message' => $th->getMessage(),
             ], 500);
         }
@@ -37,19 +39,21 @@ class CourseClassController extends Controller
     {
         try {
             $validated = $request->validate([
-                'course' => 'required|string|max:255',  // React+laravel  C++/OPP/MYSQL
-                'room' => 'required|string|min:3| max:10', // B202
-                'term' => 'required|string', // Monday - Thursdy
-                'class_time' => 'required|string', // 9:00 - 10:30
+                'course'     => 'required|string|max:255',       // React+laravel  C++/OPP/MYSQL
+                'room'       => 'required|string|min:3| max:10', // B202
+                'term'       => 'required|string',               // Monday - Thursdy
+                'class_time' => 'required|string',               // 9:00 - 10:30
             ]);
 
-            $class = CourseClass::create($validated);
+            $userId = $request->user()->id;
+            $class  = CourseClass::create($validated);
+            $class->users()->attach($userId);
 
             return response()->json($class, 201);
 
         } catch (\Throwable $th) {
             return response()->json([
-                'status' => 500,
+                'status'  => 500,
                 'message' => $th->getMessage(),
             ], 500);
         }
@@ -65,11 +69,11 @@ class CourseClassController extends Controller
 
             return response()->json([
                 'status' => 'success',
-                'data' => $Courseclass,
+                'data'   => $Courseclass,
             ], 200);
         } catch (\Throwable $th) {
             return response()->json([
-                'status' => 500,
+                'status'  => 500,
                 'message' => $th->getMessage(),
             ], 500);
         }
@@ -84,26 +88,26 @@ class CourseClassController extends Controller
             // Check if the class exists
             if (! $courseClass) {
                 return response()->json([
-                    'status' => 'error',
+                    'status'  => 'error',
                     'message' => 'The specified class was not found.',
                 ], 404);
             }
 
             return response()->json([
-                'status' => 'success',
+                'status'     => 'success',
                 'class_info' => [
-                    'id' => $courseClass->id,
-                    'course_name' => $courseClass->course,
-                    'room' => $courseClass->room,
+                    'id'             => $courseClass->id,
+                    'course_name'    => $courseClass->course,
+                    'room'           => $courseClass->room,
                     'total_students' => $courseClass->students->count(),
                 ],
-                'data' => $courseClass->students,
+                'data'       => $courseClass->students,
             ], 200);
 
         } catch (\Throwable $th) {
             return response()->json([
-                'status' => 'error',
-                'message' => 'Server Error: '.$th->getMessage(),
+                'status'  => 'error',
+                'message' => 'Server Error: ' . $th->getMessage(),
             ], 500);
         }
     }
@@ -120,21 +124,58 @@ class CourseClassController extends Controller
             $courseClass = CourseClass::findOrFail($id);
 
             $validated = $request->validate([
-                'course' => 'required|string|max:255',
-                'room' => 'required|string|min:3|max:100',
-                'term' => 'required|string',
+                'course'     => 'required|string|max:255',
+                'room'       => 'required|string|min:3|max:100',
+                'term'       => 'required|string',
                 'class_time' => 'required|string',
             ]);
 
             $courseClass->update($validated);
 
             return response()->json([
-                'status' => 200,
+                'status'  => 200,
                 'message' => 'Class updated Successfully',
-                'data' => $courseClass,
+                'data'    => $courseClass,
             ], 200);
         } catch (\Throwable $th) {
             return response()->json(['message' => $th->getMessage()], 500);
+        }
+    }
+    public function removeStudentFromClass(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'student_id' => 'required|exists:students,id',
+                'class_id'   => 'required|exists:course_classes,id',
+            ]);
+
+            //  Fetch the Class Model
+            $class     = CourseClass::findOrFail($validated['class_id']);
+            $studentId = $validated['student_id'];
+
+            // Enrollment Check using the pivot table defined in your model
+            $isEnrolled = $class->students()->where('student_id', $studentId)->exists();
+
+            if (! $isEnrolled) {
+                return response()->json([
+                    'status'  => 403,
+                    'message' => 'Student is not enrolled in this class.',
+                ], 403);
+            }
+
+            //  Perform the removal
+            $class->students()->detach($studentId);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Student removed from class successfully',
+            ], 200);
+
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Remove failed: ' . $th->getMessage(),
+            ], 500);
         }
     }
 
@@ -148,19 +189,19 @@ class CourseClassController extends Controller
 
             if (! $courseClass) {
                 return response()->json([
-                    'status' => 404,
+                    'status'  => 404,
                     'message' => 'Class Not Found!',
                 ], 404);
             }
             $courseClass->delete();
 
             return response()->json([
-                'status' => 200,
+                'status'  => 200,
                 'message' => 'Class Deleted Successfully!',
             ], 200);
         } catch (\Throwable $th) {
             return response()->json([
-                'status' => 500,
+                'status'  => 500,
                 'message' => $th->getMessage(),
             ], 500);
         }

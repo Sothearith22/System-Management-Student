@@ -14,15 +14,22 @@ class AttendanceController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $attendence = Attendance::with('student')->get();
+            $user = $request->user();
+
+            // Get attendance records where the associated class belongs to the logged-in user
+            $attendance = Attendance::with(['student', 'class'])
+                ->whereHas('class.users', function ($query) use ($user) {
+                    $query->where('users.id', $user->id);
+                })
+                ->get();
 
             return response()->json([
                 'status' => 200,
-                'message' => 'Attendence Retrieved Successfully',
-                'data' => $attendence,
+                'message' => 'Attendance Retrieved Successfully',
+                'data' => $attendance,
             ], 200);
         } catch (\Throwable $th) {
             return response()->json([
@@ -53,7 +60,7 @@ class AttendanceController extends Controller
                 ->where('class_id', $validated['class_id'])
                 ->exists();
 
-            if (!$isEnrolled) {
+            if (! $isEnrolled) {
                 return response()->json([
                     'status' => 403,
                     'message' => 'Student is not enrolled in this class.',
@@ -103,21 +110,28 @@ class AttendanceController extends Controller
     /**
      * Display the specified resource.
      */
-    public function getStudentAttendance($stuid)
+    public function getStudentAttendance(Request $request , $stuid)
     {
         $student = Student::find($stuid);
 
-        if (!$student) {
+        if (! $student) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Student ID not found',
             ], 404);
         }
 
-        $data = Attendance::with('course_classes')
-            ->where('student_id', $stuid)
-            ->latest()
-            ->paginate(10); // change number if needed
+        //  Build the query
+        $query = Attendance::with('class')
+            ->where('student_id', $stuid);
+
+        //  Filter by class_id if it's provided in the URL
+        if ($request->has('class_id')) {
+            $query->where('class_id', $request->class_id);
+        }
+
+        // Increase pagination or use get()
+        $data = $query->latest()->paginate(50);
 
         return response()->json([
             'status' => 'success',
@@ -148,7 +162,7 @@ class AttendanceController extends Controller
                 ->where('class_id', $validated['class_id'])
                 ->exists();
 
-            if (!$isEnrolled) {
+            if (! $isEnrolled) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Student is not enrolled in this class',
@@ -188,7 +202,7 @@ class AttendanceController extends Controller
                     'total_absent' => (int) $stats->total_absent,
                     'total_permission' => (int) $stats->total_permission,
                     'total_late' => (int) $stats->total_late,
-                    'attendance_rate' => $attendanceRate . '%',
+                    'attendance_rate' => $attendanceRate.'%',
                 ],
             ], 200);
 
